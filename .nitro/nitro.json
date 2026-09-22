@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-22T18:54:37.795Z",
+  "preset": "nitro-dev",
+  "framework": {
+    "name": "nitro",
+    "version": ""
+  },
+  "versions": {
+    "nitro": "2.13.4"
+  },
+  "dev": {
+    "pid": 23348,
+    "workerAddress": {
+      "host": "localhost",
+      "port": 49691
+    }
+  }
+}
