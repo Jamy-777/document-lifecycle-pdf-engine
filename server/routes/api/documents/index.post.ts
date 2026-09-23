@@ -12,6 +12,11 @@ import {
     createDocument,
 } from "../../../services/document.service";
 
+import {
+    TemplateDataValidationError,
+    TemplateNotFoundError,
+} from "../../../domain/errors";
+
 export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
@@ -26,10 +31,29 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const document =
-        await createDocument(validation.data);
+    try {
+        const document =
+            await createDocument(validation.data);
 
-    setResponseStatus(event, 201);
+        setResponseStatus(event, 201);
 
-    return document;
+        return document;
+    } catch (error) {
+        if (error instanceof TemplateNotFoundError) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: error.message,
+            });
+        }
+
+        if (error instanceof TemplateDataValidationError) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: error.message,
+                data: error.issues,
+            });
+        }
+
+        throw error;
+    }
 });

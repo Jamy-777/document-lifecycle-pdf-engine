@@ -926,22 +926,7 @@ const plugins = [
   
 ];
 
-const assets = {
-  "/index.mjs": {
-    "type": "text/javascript; charset=utf-8",
-    "etag": "\"c928-fh9WgWDaZ4GayIsYSdb1XdAg8FI\"",
-    "mtime": "2026-09-23T15:17:40.668Z",
-    "size": 51496,
-    "path": "index.mjs"
-  },
-  "/index.mjs.map": {
-    "type": "application/json",
-    "etag": "\"2ca66-h2Q8oV9daXC/t1MjIrgz449mQwI\"",
-    "mtime": "2026-09-23T15:17:40.668Z",
-    "size": 182886,
-    "path": "index.mjs.map"
-  }
-};
+const assets = {};
 
 function readAsset (id) {
   const serverDir = dirname$1(fileURLToPath(globalThis._importMeta_.url));
@@ -1380,8 +1365,204 @@ class InvalidStateTransitionError extends Error {
     this.name = "InvalidStateTransitionError";
   }
 }
+class TemplateNotFoundError extends Error {
+  constructor(templateId) {
+    super(
+      `Template "${templateId}" is not registered`
+    );
+    __publicField(this, "templateId", templateId);
+    this.name = "TemplateNotFoundError";
+  }
+}
+class TemplateDataValidationError extends Error {
+  constructor(templateId, issues) {
+    super(
+      `Data for template "${templateId}" is invalid`
+    );
+    __publicField(this, "templateId", templateId);
+    __publicField(this, "issues", issues);
+    this.name = "TemplateDataValidationError";
+  }
+}
+
+const jazzFestivalTicketSchema = z.object({
+  series: z.string().min(1),
+  ticketNumber: z.string().min(1),
+  presenter: z.string().min(1),
+  eventTitle: z.string().min(1),
+  eventYear: z.string().min(1),
+  passType: z.string().min(1),
+  dates: z.object({
+    primary: z.string().min(1),
+    secondary: z.string().optional()
+  }),
+  gateTime: z.object({
+    time: z.string().min(1),
+    note: z.string().optional()
+  }),
+  entry: z.object({
+    gate: z.string().min(1),
+    description: z.string().optional()
+  }),
+  admission: z.object({
+    quantity: z.number().int().positive(),
+    rule: z.string().min(1)
+  }),
+  venue: z.object({
+    name: z.string().min(1),
+    address: z.string().min(1),
+    description: z.string().optional(),
+    note: z.string().optional()
+  }),
+  mapReference: z.string().min(1),
+  stub: z.object({
+    heading: z.string().min(1),
+    gate: z.string().min(1),
+    section: z.string().min(1),
+    dates: z.string().min(1),
+    reference: z.string().min(1)
+  }),
+  qrValue: z.string().min(1),
+  website: z.string().min(1),
+  printDate: z.string().min(1)
+});
+
+const jazzFestivalTicketFixture = {
+  series: "017",
+  ticketNumber: "RJF26-00482",
+  presenter: "RIVERSIDE PRESENTS",
+  eventTitle: "Jazz Festival",
+  eventYear: "2026",
+  passType: "VIP Weekend Pass",
+  dates: {
+    primary: "Jul 18\u201319",
+    secondary: "Saturday & Sunday"
+  },
+  gateTime: {
+    time: "12:00 PM",
+    note: "First set 1:30 PM"
+  },
+  entry: {
+    gate: "Gate C",
+    description: "VIP Lane \xB7 West"
+  },
+  admission: {
+    quantity: 1,
+    rule: "Non-transferable"
+  },
+  venue: {
+    name: "Willow Bend Riverfront Park",
+    address: "1420 Harbor Promenade \xB7 Main Stage & North Pavilion",
+    description: "Main or shine",
+    note: "Ages 18+ for VIP Lounge"
+  },
+  mapReference: "C\u20134",
+  stub: {
+    heading: "VIP Weekend",
+    gate: "Gate C",
+    section: "VIP",
+    dates: "Jul 18\u201319, 2026",
+    reference: "RJF26 \xB7 00482 \xB7 VIP"
+  },
+  qrValue: "RJF26-00482",
+  website: "RIVERSIDEJAZZ.FEST",
+  printDate: "04.11.2026"
+};
+
+function transformJazzFestivalTicketInput(input) {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return input;
+  }
+  const data = {
+    ...input
+  };
+  if (typeof data.venue === "string") {
+    data.venue = {
+      name: data.venue
+    };
+  }
+  return data;
+}
+
+const jazzFestivalTicketTemplate = {
+  id: "jazz-festival-ticket",
+  name: "VIP Weekend Pass - Jazz Festival",
+  schema: jazzFestivalTicketSchema,
+  defaultData: jazzFestivalTicketFixture,
+  transformInput: transformJazzFestivalTicketInput
+};
+
+const templates = /* @__PURE__ */ new Map();
+function registerTemplate(template) {
+  if (templates.has(template.id)) {
+    throw new Error(
+      `Template "${template.id}" is already registered`
+    );
+  }
+  templates.set(
+    template.id,
+    template
+  );
+}
+registerTemplate(
+  jazzFestivalTicketTemplate
+);
+function getTemplate(templateId) {
+  var _a;
+  return (_a = templates.get(templateId)) != null ? _a : null;
+}
+
+function deepMerge(target, source) {
+  if (typeof target !== "object" || target === null || Array.isArray(target)) {
+    return source;
+  }
+  if (typeof source !== "object" || source === null || Array.isArray(source)) {
+    return source;
+  }
+  const result = {
+    ...target
+  };
+  for (const key of Object.keys(source)) {
+    if (key in target && typeof target[key] === "object" && target[key] !== null && !Array.isArray(target[key]) && typeof source[key] === "object" && source[key] !== null && !Array.isArray(source[key])) {
+      result[key] = deepMerge(
+        target[key],
+        source[key]
+      );
+    } else {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+function validateTemplateData(templateId, data) {
+  const template = getTemplate(templateId);
+  if (!template) {
+    throw new TemplateNotFoundError(
+      templateId
+    );
+  }
+  const transformedData = template.transformInput ? template.transformInput(data) : data;
+  const mergedData = deepMerge(
+    template.defaultData,
+    transformedData
+  );
+  const validation = template.schema.safeParse(
+    mergedData
+  );
+  if (!validation.success) {
+    throw new TemplateDataValidationError(
+      templateId,
+      validation.error.flatten()
+    );
+  }
+  return validation.data;
+}
 
 async function createDocument(input) {
+  const validateData = validateTemplateData(
+    input.templateId,
+    input.data
+  );
   const now = /* @__PURE__ */ new Date();
   const document = {
     id: crypto.randomUUID(),
@@ -1389,7 +1570,7 @@ async function createDocument(input) {
     title: input.title,
     createdBy: input.createdBy,
     state: "DRAFT",
-    data: input.data,
+    data: validateData,
     createdAt: now,
     updatedAt: now
   };
@@ -1573,9 +1754,26 @@ const index_post = defineEventHandler(async (event) => {
       data: validation.error.flatten()
     });
   }
-  const document = await createDocument(validation.data);
-  setResponseStatus(event, 201);
-  return document;
+  try {
+    const document = await createDocument(validation.data);
+    setResponseStatus(event, 201);
+    return document;
+  } catch (error) {
+    if (error instanceof TemplateNotFoundError) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message
+      });
+    }
+    if (error instanceof TemplateDataValidationError) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message,
+        data: error.issues
+      });
+    }
+    throw error;
+  }
 });
 
 const index_post$1 = /*#__PURE__*/Object.freeze({

@@ -21,9 +21,20 @@ import type {
     TransitionDocumentInput,
 } from "../validation/document";
 
+import {
+    validateTemplateData,
+} from "./template.service";
+import { validate } from "zod";
+
 export async function createDocument(
     input: CreateDocumentInput,
 ) {
+    const validateData =
+        validateTemplateData(
+            input.templateId,
+            input.data,
+        );
+
     const now = new Date();
 
     const document = {
@@ -37,7 +48,7 @@ export async function createDocument(
 
         state: "DRAFT" as const,
 
-        data: input.data,
+        data: validateData,
 
         createdAt: now,
 
