@@ -15,3 +15,18 @@ export const createDocumentSchema = z.object({
 
 export type CreateDocumentInput =
     z.infer<typeof createDocumentSchema>;
+
+export const transitionDocumentSchema = z.object({
+    action: z.enum([
+        "SENT",
+        "SIGNED",
+        "VOIDED",
+    ]),
+
+    actor: z.string().min(1),
+
+    note: z.string().trim().min(1).optional(),
+});
+
+export type TransitionDocumentInput =
+    z.infer<typeof transitionDocumentSchema>;

@@ -25,7 +25,7 @@ import { promises } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname as dirname$1, resolve as resolve$1 } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/pathe/dist/index.mjs';
 import { z } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/zod/index.js';
-import { eq } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/index.js';
+import { eq, and } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/index.js';
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/bun-sqlite/index.js';
 import { sqliteTable, integer, text } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/sqlite-core/index.js';
@@ -1016,12 +1016,14 @@ const _J861uL = eventHandler((event) => {
 });
 
 const _lazy_Kegdjc = () => Promise.resolve().then(function () { return _id__get$1; });
+const _lazy_SYYjIf = () => Promise.resolve().then(function () { return transition_post$1; });
 const _lazy_9oW9tO = () => Promise.resolve().then(function () { return index_post$1; });
 const _lazy_nSptZd = () => Promise.resolve().then(function () { return index$1; });
 
 const handlers = [
   { route: '', handler: _J861uL, lazy: false, middleware: true, method: undefined },
   { route: '/api/documents/:id', handler: _lazy_Kegdjc, lazy: true, middleware: false, method: "get" },
+  { route: '/api/documents/:id/transition', handler: _lazy_SYYjIf, lazy: true, middleware: false, method: "post" },
   { route: '/api/documents', handler: _lazy_9oW9tO, lazy: true, middleware: false, method: "post" },
   { route: '/', handler: _lazy_nSptZd, lazy: true, middleware: false, method: undefined }
 ];
@@ -1330,6 +1332,30 @@ sqliteTable("audit_logs", {
   note: text("note")
 });
 
+const ALLOWED_TRANSITIONS = {
+  DRAFT: ["SENT", "VOIDED"],
+  SENT: ["SIGNED", "VOIDED"],
+  SIGNED: [],
+  VOIDED: []
+};
+function canTransition(from, to) {
+  return ALLOWED_TRANSITIONS[from].includes(to);
+}
+
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+class InvalidStateTransitionError extends Error {
+  constructor(from, to) {
+    super(
+      `Invalid document state transition: ${from} -> ${to}`
+    );
+    __publicField(this, "from", from);
+    __publicField(this, "to", to);
+    this.name = "InvalidStateTransitionError";
+  }
+}
+
 async function createDocument(input) {
   const now = /* @__PURE__ */ new Date();
   const document = {
@@ -1349,6 +1375,36 @@ async function getDocumentById(id) {
   var _a;
   const result = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
   return (_a = result[0]) != null ? _a : null;
+}
+async function transitionDocument(id, input) {
+  const document = await getDocumentById(id);
+  if (!document) {
+    return null;
+  }
+  const currentState = document.state;
+  const nextState = input.action;
+  if (!canTransition(currentState, nextState)) {
+    throw new InvalidStateTransitionError(
+      currentState,
+      nextState
+    );
+  }
+  const now = /* @__PURE__ */ new Date();
+  const result = await db.update(documents).set({
+    state: nextState,
+    updatedAt: now
+  }).where(
+    and(
+      eq(documents.id, id),
+      eq(documents.state, currentState)
+    )
+  ).returning();
+  if (result.length === 0) {
+    throw new Error(
+      "Document state changed during transition"
+    );
+  }
+  return result[0];
 }
 
 const _id__get = defineEventHandler(async (event) => {
@@ -1382,6 +1438,60 @@ const createDocumentSchema = z.object({
     z.string(),
     z.unknown()
   )
+});
+const transitionDocumentSchema = z.object({
+  action: z.enum([
+    "SENT",
+    "SIGNED",
+    "VOIDED"
+  ]),
+  actor: z.string().min(1),
+  note: z.string().trim().min(1).optional()
+});
+
+const transition_post = defineEventHandler(async (event) => {
+  const id = getRouterParam(event, "id");
+  if (!id) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Document ID is required"
+    });
+  }
+  const body = await readBody(event);
+  const validation = transitionDocumentSchema.safeParse(body);
+  if (!validation.success) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Invalid transition payload",
+      data: validation.error.flatten()
+    });
+  }
+  try {
+    const document = await transitionDocument(
+      id,
+      validation.data
+    );
+    if (!document) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: "Document not found"
+      });
+    }
+    return document;
+  } catch (error) {
+    if (error instanceof InvalidStateTransitionError) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message
+      });
+    }
+    throw error;
+  }
+});
+
+const transition_post$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: transition_post
 });
 
 const index_post = defineEventHandler(async (event) => {
