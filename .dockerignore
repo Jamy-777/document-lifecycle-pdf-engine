@@ -14,6 +14,7 @@ local.db
 ticket-preview*.pdf
 downloaded-ticket.pdf
 custom-ticket.pdf
+vip-weekend-pass*.pdf
 
 .vscode
 .idea

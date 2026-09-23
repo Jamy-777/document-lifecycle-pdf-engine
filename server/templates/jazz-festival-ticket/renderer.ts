@@ -46,6 +46,7 @@ function drawLabel(
         .text(label.toUpperCase(), x, y, {
             width,
             characterSpacing: 1.5,
+            lineBreak: false,
         });
 }
 
@@ -74,7 +75,7 @@ export async function renderJazzFestivalTicket(
     data: JazzFestivalTicketData,
 ): Promise<Buffer> {
     const PAGE_WIDTH = 720;
-    const PAGE_HEIGHT = 520;
+    const PAGE_HEIGHT = 500;
 
     const doc = new PDFDocument({
         size: [
@@ -90,24 +91,31 @@ export async function renderJazzFestivalTicket(
     });
 
     const output = collectPdf(doc);
+
     const ticketX = 55;
-    const ticketY = 45;
+    const ticketY = 32;
 
     const ticketWidth = 610;
-    const ticketHeight = 420;
+    const ticketHeight = 436;
 
-    const footerHeight = 38;
-
-    const contentHeight =
-        ticketHeight - footerHeight;
+    const footerHeight = 36;
+    const contentHeight = ticketHeight - footerHeight;
 
     const stubWidth = 160;
+    const mainWidth = ticketWidth - stubWidth;
+    const stubX = ticketX + mainWidth;
 
-    const mainWidth =
-        ticketWidth - stubWidth;
+    const innerPadding = 12;
+    const innerX = ticketX + innerPadding;
+    const innerY = ticketY + innerPadding;
+    const innerWidth = mainWidth - innerPadding;
+    const innerHeight = contentHeight - innerPadding;
 
-    const stubX =
-        ticketX + mainWidth;
+    const stubInnerX = stubX;
+    const stubInnerY = ticketY + innerPadding;
+    const stubInnerWidth = stubWidth - innerPadding;
+    const stubInnerHeight = innerHeight;
+
     doc
         .rect(
             ticketX,
@@ -116,48 +124,47 @@ export async function renderJazzFestivalTicket(
             ticketHeight,
         )
         .fill(COLORS.paper);
+
     doc
         .lineWidth(1.2)
         .strokeColor(COLORS.navy)
         .rect(
-            ticketX + 12,
-            ticketY + 12,
-            mainWidth - 12,
-            contentHeight - 12,
+            innerX,
+            innerY,
+            innerWidth,
+            innerHeight,
         )
         .stroke();
+
     doc
         .rect(
-            stubX,
-            ticketY + 12,
-            stubWidth - 12,
-            contentHeight - 12,
+            stubInnerX,
+            stubInnerY,
+            stubInnerWidth,
+            stubInnerHeight,
         )
         .fill(COLORS.navy);
+
     drawDashedVerticalLine(
         doc,
         stubX,
-        ticketY + 12,
-        ticketY + contentHeight,
+        stubInnerY,
+        stubInnerY + stubInnerHeight,
     );
-    const left =
-        ticketX + 52;
 
-    const right =
-        stubX - 38;
+    const left = innerX + 28;
+    const right = stubX - 25;
+    const usableWidth = right - left;
 
-    const usableWidth =
-        right - left;
-    const topY =
-        ticketY + 42;
+    const topY = innerY + 18;
 
     doc
         .fillColor(COLORS.accent)
         .rect(
             left,
-            topY - 4,
-            102,
-            19,
+            topY - 3,
+            96,
+            18,
         )
         .fill();
 
@@ -168,10 +175,11 @@ export async function renderJazzFestivalTicket(
         .text(
             `SERIES • ${data.series}`,
             left + 9,
-            topY + 2,
+            topY + 3,
             {
-                width: 88,
+                width: 80,
                 characterSpacing: 1.2,
+                lineBreak: false,
             },
         );
 
@@ -181,10 +189,11 @@ export async function renderJazzFestivalTicket(
         .fillColor(COLORS.navy)
         .text(
             `NO. ${data.ticketNumber}`,
-            left + 145,
-            topY + 2,
+            left + 125,
+            topY + 3,
             {
-                width: 145,
+                width: 140,
+                lineBreak: false,
             },
         );
 
@@ -193,31 +202,27 @@ export async function renderJazzFestivalTicket(
         .fontSize(10)
         .text(
             "EST. 1989",
-            right - 68,
-            topY,
+            right - 70,
+            topY + 2,
             {
-                width: 68,
+                width: 70,
                 align: "right",
+                lineBreak: false,
             },
         );
+
     doc
-        .moveTo(
-            left,
-            topY + 34,
-        )
-        .lineTo(
-            right,
-            topY + 34,
-        )
+        .moveTo(left, topY + 27)
+        .lineTo(right, topY + 27)
         .lineWidth(0.7)
         .strokeColor(COLORS.navy)
         .stroke();
-    const presenterY =
-        topY + 70;
+
+    const presenterY = topY + 40;
 
     doc
         .font("Courier")
-        .fontSize(7)
+        .fontSize(6.5)
         .fillColor(COLORS.muted)
         .text(
             data.presenter.toUpperCase(),
@@ -225,15 +230,16 @@ export async function renderJazzFestivalTicket(
             presenterY,
             {
                 width: usableWidth,
-                characterSpacing: 2.3,
+                characterSpacing: 2.2,
+                lineBreak: false,
             },
         );
-    const titleY =
-        presenterY + 27;
+
+    const titleY = presenterY + 16;
 
     doc
         .font("Times-Bold")
-        .fontSize(31)
+        .fontSize(28)
         .fillColor(COLORS.navy)
         .text(
             "Jazz",
@@ -244,17 +250,19 @@ export async function renderJazzFestivalTicket(
             },
         );
 
+    const restOfTitle = data.eventTitle.replace(/^Jazz\s*/i, "");
+
     doc
         .font("Times-Italic")
-        .fontSize(30)
+        .fontSize(27)
         .fillColor(COLORS.accent)
         .text(
-            data.eventTitle
-                .replace(/^Jazz\s*/i, ""),
+            restOfTitle ? `${restOfTitle} ` : "",
             left,
-            titleY + 31,
+            titleY + 30,
             {
                 continued: true,
+                lineBreak: false,
             },
         );
 
@@ -265,18 +273,19 @@ export async function renderJazzFestivalTicket(
             data.eventYear,
             {
                 continued: false,
+                lineBreak: false,
             },
         );
-    const badgeY =
-        titleY + 77;
+
+    const badgeY = titleY + 70;
 
     doc
         .fillColor(COLORS.navy)
         .rect(
             left,
             badgeY,
-            205,
-            29,
+            195,
+            24,
         )
         .fill();
 
@@ -286,20 +295,24 @@ export async function renderJazzFestivalTicket(
         .fillColor(COLORS.gold)
         .text(
             "★",
-            left + 14,
-            badgeY + 9,
+            left + 12,
+            badgeY + 7,
+            {
+                lineBreak: false,
+            },
         );
 
     doc
         .fillColor(COLORS.white)
         .text(
             data.passType,
-            left + 35,
-            badgeY + 9,
+            left + 28,
+            badgeY + 7,
             {
                 width: 140,
                 align: "center",
                 characterSpacing: 1,
+                lineBreak: false,
             },
         );
 
@@ -307,29 +320,25 @@ export async function renderJazzFestivalTicket(
         .fillColor(COLORS.gold)
         .text(
             "★",
-            left + 184,
-            badgeY + 9,
+            left + 175,
+            badgeY + 7,
+            {
+                lineBreak: false,
+            },
         );
-    const metadataTop =
-        badgeY + 60;
+
+    const metadataTop = badgeY + 40;
 
     doc
-        .moveTo(
-            left,
-            metadataTop,
-        )
-        .lineTo(
-            right,
-            metadataTop,
-        )
+        .moveTo(left, metadataTop)
+        .lineTo(right, metadataTop)
         .lineWidth(0.6)
         .strokeColor(COLORS.navy)
         .stroke();
-    const gridY =
-        metadataTop + 29;
 
-    const columnWidth =
-        usableWidth / 4;
+    const gridY = metadataTop + 13;
+    const columnWidth = usableWidth / 4;
+
     drawLabel(
         doc,
         "Dates",
@@ -340,33 +349,35 @@ export async function renderJazzFestivalTicket(
 
     doc
         .font("Times-Bold")
-        .fontSize(12)
+        .fontSize(11.5)
         .fillColor(COLORS.navy)
         .text(
             data.dates.primary,
             left,
-            gridY + 17,
+            gridY + 14,
             {
                 width: columnWidth - 10,
+                lineBreak: false,
             },
         );
 
     if (data.dates.secondary) {
         doc
             .font("Courier")
-            .fontSize(6)
+            .fontSize(5.5)
             .fillColor(COLORS.muted)
             .text(
                 data.dates.secondary,
                 left,
-                gridY + 44,
+                gridY + 30,
                 {
                     width: columnWidth - 10,
+                    lineBreak: false,
                 },
             );
     }
-    const gateX =
-        left + columnWidth;
+
+    const gateX = left + columnWidth;
 
     drawLabel(
         doc,
@@ -378,33 +389,35 @@ export async function renderJazzFestivalTicket(
 
     doc
         .font("Times-Bold")
-        .fontSize(12)
+        .fontSize(11.5)
         .fillColor(COLORS.navy)
         .text(
             data.gateTime.time,
             gateX,
-            gridY + 17,
+            gridY + 14,
             {
                 width: columnWidth - 10,
+                lineBreak: false,
             },
         );
 
     if (data.gateTime.note) {
         doc
             .font("Courier")
-            .fontSize(6)
+            .fontSize(5.5)
             .fillColor(COLORS.muted)
             .text(
                 data.gateTime.note,
                 gateX,
-                gridY + 44,
+                gridY + 30,
                 {
                     width: columnWidth - 10,
+                    lineBreak: false,
                 },
             );
     }
-    const entryX =
-        left + columnWidth * 2;
+
+    const entryX = left + columnWidth * 2;
 
     drawLabel(
         doc,
@@ -416,33 +429,35 @@ export async function renderJazzFestivalTicket(
 
     doc
         .font("Times-Bold")
-        .fontSize(12)
+        .fontSize(11.5)
         .fillColor(COLORS.navy)
         .text(
             data.entry.gate,
             entryX,
-            gridY + 17,
+            gridY + 14,
             {
                 width: columnWidth - 10,
+                lineBreak: false,
             },
         );
 
     if (data.entry.description) {
         doc
             .font("Courier")
-            .fontSize(6)
+            .fontSize(5.5)
             .fillColor(COLORS.muted)
             .text(
                 data.entry.description,
                 entryX,
-                gridY + 44,
+                gridY + 30,
                 {
                     width: columnWidth - 10,
+                    lineBreak: false,
                 },
             );
     }
-    const admitsX =
-        left + columnWidth * 3;
+
+    const admitsX = left + columnWidth * 3;
 
     drawLabel(
         doc,
@@ -454,47 +469,42 @@ export async function renderJazzFestivalTicket(
 
     doc
         .font("Times-Bold")
-        .fontSize(12)
+        .fontSize(11.5)
         .fillColor(COLORS.navy)
         .text(
-            String(data.admission.quantity)
-                .padStart(2, "0"),
+            String(data.admission.quantity).padStart(2, "0"),
             admitsX,
-            gridY + 17,
+            gridY + 14,
             {
                 width: columnWidth - 10,
+                lineBreak: false,
             },
         );
 
     doc
         .font("Courier")
-        .fontSize(6)
+        .fontSize(5.5)
         .fillColor(COLORS.muted)
         .text(
             data.admission.rule,
             admitsX,
-            gridY + 44,
+            gridY + 30,
             {
                 width: columnWidth - 10,
+                lineBreak: false,
             },
         );
-    const venueDividerY =
-        gridY + 81;
+
+    const venueDividerY = gridY + 50;
 
     doc
-        .moveTo(
-            left,
-            venueDividerY,
-        )
-        .lineTo(
-            right,
-            venueDividerY,
-        )
+        .moveTo(left, venueDividerY)
+        .lineTo(right, venueDividerY)
         .lineWidth(0.6)
         .strokeColor(COLORS.navy)
         .stroke();
-    const venueY =
-        venueDividerY + 20;
+
+    const venueY = venueDividerY + 13;
 
     drawLabel(
         doc,
@@ -506,27 +516,29 @@ export async function renderJazzFestivalTicket(
 
     doc
         .font("Times-BoldItalic")
-        .fontSize(15)
+        .fontSize(13.5)
         .fillColor(COLORS.navy)
         .text(
             data.venue.name,
             left,
-            venueY + 18,
+            venueY + 14,
             {
                 width: 250,
+                lineBreak: false,
             },
         );
 
     doc
         .font("Courier")
-        .fontSize(6)
+        .fontSize(5.5)
         .fillColor(COLORS.muted)
         .text(
             data.venue.address,
             left,
-            venueY + 53,
+            venueY + 33,
             {
-                width: 270,
+                width: 260,
+                lineBreak: false,
             },
         );
 
@@ -541,17 +553,18 @@ export async function renderJazzFestivalTicket(
         doc.text(
             venueDetails,
             left,
-            venueY + 69,
+            venueY + 45,
             {
-                width: 270,
+                width: 260,
+                lineBreak: false,
             },
         );
     }
-    const mapX =
-        right - 102;
 
-    const mapY =
-        venueY + 28;
+    const mapWidth = 86;
+    const mapHeight = 50;
+    const mapX = right - mapWidth;
+    const mapY = venueY + 4;
 
     doc
         .lineWidth(0.8)
@@ -559,22 +572,23 @@ export async function renderJazzFestivalTicket(
         .rect(
             mapX,
             mapY,
-            92,
-            55,
+            mapWidth,
+            mapHeight,
         )
         .stroke();
 
     doc
         .font("Times-Bold")
-        .fontSize(17)
+        .fontSize(16)
         .fillColor(COLORS.accent)
         .text(
             data.mapReference,
             mapX,
-            mapY + 11,
+            mapY + 10,
             {
-                width: 92,
+                width: mapWidth,
                 align: "center",
+                lineBreak: false,
             },
         );
 
@@ -585,79 +599,77 @@ export async function renderJazzFestivalTicket(
         .text(
             "MAP REFERENCE",
             mapX,
-            mapY + 37,
+            mapY + 32,
             {
-                width: 92,
+                width: mapWidth,
                 align: "center",
                 characterSpacing: 1,
+                lineBreak: false,
             },
         );
-    const stubCenter =
-        stubX + stubWidth / 2 - 6;
+
+    const stubCenter = stubInnerX + stubInnerWidth / 2;
 
     doc
-        .font("Courier")
+        .font("Courier-Bold")
         .fontSize(6)
         .fillColor(COLORS.gold)
         .text(
             "ADMIT ONE",
-            stubX + 20,
-            ticketY + 43,
+            stubInnerX + 10,
+            stubInnerY + 20,
             {
-                width: stubWidth - 40,
+                width: stubInnerWidth - 20,
                 align: "center",
                 characterSpacing: 1.8,
+                lineBreak: false,
             },
         );
 
     doc
         .font("Times-BoldItalic")
-        .fontSize(18)
+        .fontSize(15)
         .fillColor(COLORS.white)
         .text(
             data.stub.heading,
-            stubX + 20,
-            ticketY + 67,
+            stubInnerX + 10,
+            stubInnerY + 38,
             {
-                width: stubWidth - 40,
+                width: stubInnerWidth - 20,
                 align: "center",
-            },
-        );
-    const qrDataUrl =
-        await QRCode.toDataURL(
-            data.qrValue,
-            {
-                errorCorrectionLevel: "M",
-                margin: 1,
-                width: 220,
-                color: {
-                    dark: "#17192FFF",
-                    light: "#F3EBDDFF",
-                },
+                lineBreak: false,
             },
         );
 
-    const qrBuffer =
-        Buffer.from(
-            qrDataUrl.split(",")[1]!,
-            "base64",
-        );
+    const qrDataUrl = await QRCode.toDataURL(
+        data.qrValue,
+        {
+            errorCorrectionLevel: "M",
+            margin: 1,
+            width: 200,
+            color: {
+                dark: "#17192FFF",
+                light: "#F3EBDDFF",
+            },
+        },
+    );
 
-    const qrSize = 92;
+    const qrBuffer = Buffer.from(
+        qrDataUrl.split(",")[1]!,
+        "base64",
+    );
 
-    const qrX =
-        stubCenter - qrSize / 2;
-
-    const qrY =
-        ticketY + 123;
+    const qrSize = 88;
+    const qrX = stubCenter - qrSize / 2;
+    const qrY = stubInnerY + 76;
 
     doc
         .fillColor(COLORS.paper)
         .rect(
-            qrX - 8,
-            qrY - 8,
-            qrSize + 16,
-            qrSize + 16,
+            qrX - 6,
+            qrY - 6,
+            qrSize + 12,
+            qrSize + 12,
         )
         .fill();
 
@@ -670,43 +682,48 @@ export async function renderJazzFestivalTicket(
             height: qrSize,
         },
     );
+
+    const stubMetaY = qrY + qrSize + 16;
+
     doc
         .font("Courier")
-        .fontSize(6)
+        .fontSize(5.5)
         .fillColor(COLORS.white)
         .text(
             `${data.stub.gate} · Sect. ${data.stub.section}`,
-            stubX + 15,
-            qrY + 122,
+            stubInnerX + 10,
+            stubMetaY,
             {
-                width: stubWidth - 30,
+                width: stubInnerWidth - 20,
                 align: "center",
+                lineBreak: false,
             },
         );
 
     doc
         .font("Times-BoldItalic")
-        .fontSize(10)
+        .fontSize(9.5)
         .text(
             data.stub.dates,
-            stubX + 15,
-            qrY + 143,
+            stubInnerX + 10,
+            stubMetaY + 16,
             {
-                width: stubWidth - 30,
+                width: stubInnerWidth - 20,
                 align: "center",
+                lineBreak: false,
             },
         );
-    const stubBottomY =
-        ticketY + contentHeight - 43;
+
+    const stubBottomY = stubInnerY + stubInnerHeight - 32;
 
     doc
         .moveTo(
-            stubX + 20,
-            stubBottomY - 12,
+            stubInnerX + 18,
+            stubBottomY - 10,
         )
         .lineTo(
-            stubX + stubWidth - 22,
-            stubBottomY - 12,
+            stubInnerX + stubInnerWidth - 18,
+            stubBottomY - 10,
         )
         .lineWidth(0.4)
         .strokeColor(COLORS.gold)
@@ -720,16 +737,17 @@ export async function renderJazzFestivalTicket(
         .fillColor(COLORS.gold)
         .text(
             data.stub.reference,
-            stubX + 18,
+            stubInnerX + 10,
             stubBottomY,
             {
-                width: stubWidth - 36,
+                width: stubInnerWidth - 20,
                 align: "center",
                 characterSpacing: 1,
+                lineBreak: false,
             },
         );
-    const footerY =
-        ticketY + contentHeight;
+
+    const footerY = ticketY + contentHeight + 11;
 
     doc
         .font("Courier")
@@ -737,35 +755,39 @@ export async function renderJazzFestivalTicket(
         .fillColor(COLORS.muted)
         .text(
             `SCAN AT ${data.entry.gate.toUpperCase()} • KEEP TICKET INTACT`,
-            ticketX + 22,
-            footerY + 15,
+            ticketX + 20,
+            footerY,
             {
                 width: 220,
                 characterSpacing: 1.1,
+                lineBreak: false,
             },
         );
 
     doc.text(
         data.website.toUpperCase(),
-        ticketX + 260,
-        footerY + 15,
+        ticketX + 250,
+        footerY,
         {
             width: 170,
             align: "center",
             characterSpacing: 1.1,
+            lineBreak: false,
         },
     );
 
     doc.text(
         `PRINTED ${data.printDate}`,
         stubX + 8,
-        footerY + 15,
+        footerY,
         {
             width: stubWidth - 16,
             align: "right",
             characterSpacing: 1.1,
+            lineBreak: false,
         },
     );
+
     doc.end();
 
     return output;
