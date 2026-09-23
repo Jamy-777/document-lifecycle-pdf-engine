@@ -1,6 +1,8 @@
 import type { ZodType } from "zod";
 
-export interface DocumentTemplate<TData = unknown> {
+export interface DocumentTemplate<
+    TData = unknown,
+> {
     id: string;
 
     name: string;
@@ -12,4 +14,8 @@ export interface DocumentTemplate<TData = unknown> {
     transformInput?: (
         input: unknown,
     ) => unknown;
+
+    render: (
+        data: TData,
+    ) => Promise<Buffer>;
 }

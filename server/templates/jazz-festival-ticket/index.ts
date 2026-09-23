@@ -15,6 +15,10 @@ import {
     transformJazzFestivalTicketInput,
 } from "./transform";
 
+import {
+    renderJazzFestivalTicket,
+} from "./renderer";
+
 export const jazzFestivalTicketTemplate:
     DocumentTemplate<JazzFestivalTicketData> = {
     id: "jazz-festival-ticket",
@@ -27,4 +31,7 @@ export const jazzFestivalTicketTemplate:
 
     transformInput:
         transformJazzFestivalTicketInput,
+
+    render:
+        renderJazzFestivalTicket,
 };

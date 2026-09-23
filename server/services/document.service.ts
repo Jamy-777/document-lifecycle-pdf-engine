@@ -24,7 +24,6 @@ import type {
 import {
     validateTemplateData,
 } from "./template.service";
-import { validate } from "zod";
 
 export async function createDocument(
     input: CreateDocumentInput,

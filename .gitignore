@@ -35,7 +35,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # node modules
 .output
+.nitro
 .env
 *.db
 *.db-shm
 *.db-wal
+ticket-preview*.pdf
+downloaded-ticket.pdf
+custom-ticket.pdf
