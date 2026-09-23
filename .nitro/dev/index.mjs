@@ -24,8 +24,8 @@ import { SourceMapConsumer } from 'file://C:/VSCode%20Files/Antigravity/App%20Th
 import { promises } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname as dirname$1, resolve as resolve$1 } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/pathe/dist/index.mjs';
+import { eq, and, asc } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/index.js';
 import { z } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/zod/index.js';
-import { eq, and } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/index.js';
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/bun-sqlite/index.js';
 import { sqliteTable, integer, text } from 'file://C:/VSCode%20Files/Antigravity/App%20Things/Bun/node_modules/drizzle-orm/sqlite-core/index.js';
@@ -926,7 +926,22 @@ const plugins = [
   
 ];
 
-const assets = {};
+const assets = {
+  "/index.mjs": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": "\"c928-fh9WgWDaZ4GayIsYSdb1XdAg8FI\"",
+    "mtime": "2026-09-23T15:17:40.668Z",
+    "size": 51496,
+    "path": "index.mjs"
+  },
+  "/index.mjs.map": {
+    "type": "application/json",
+    "etag": "\"2ca66-h2Q8oV9daXC/t1MjIrgz449mQwI\"",
+    "mtime": "2026-09-23T15:17:40.668Z",
+    "size": 182886,
+    "path": "index.mjs.map"
+  }
+};
 
 function readAsset (id) {
   const serverDir = dirname$1(fileURLToPath(globalThis._importMeta_.url));
@@ -1016,6 +1031,7 @@ const _J861uL = eventHandler((event) => {
 });
 
 const _lazy_Kegdjc = () => Promise.resolve().then(function () { return _id__get$1; });
+const _lazy_PsmsU5 = () => Promise.resolve().then(function () { return auditTrail_get$1; });
 const _lazy_SYYjIf = () => Promise.resolve().then(function () { return transition_post$1; });
 const _lazy_9oW9tO = () => Promise.resolve().then(function () { return index_post$1; });
 const _lazy_nSptZd = () => Promise.resolve().then(function () { return index$1; });
@@ -1023,6 +1039,7 @@ const _lazy_nSptZd = () => Promise.resolve().then(function () { return index$1; 
 const handlers = [
   { route: '', handler: _J861uL, lazy: false, middleware: true, method: undefined },
   { route: '/api/documents/:id', handler: _lazy_Kegdjc, lazy: true, middleware: false, method: "get" },
+  { route: '/api/documents/:id/audit-trail', handler: _lazy_PsmsU5, lazy: true, middleware: false, method: "get" },
   { route: '/api/documents/:id/transition', handler: _lazy_SYYjIf, lazy: true, middleware: false, method: "post" },
   { route: '/api/documents', handler: _lazy_9oW9tO, lazy: true, middleware: false, method: "post" },
   { route: '/', handler: _lazy_nSptZd, lazy: true, middleware: false, method: undefined }
@@ -1292,14 +1309,6 @@ async function shutdown() {
   parentPort?.postMessage({ event: "exit" });
 }
 
-var _a;
-const databasePath = (_a = process.env.DB_FILE_NAME) != null ? _a : "local.db";
-const sqlite = new Database(databasePath, {
-  create: true
-});
-sqlite.exec("PRAGMA foreign_keys = ON;");
-const db = drizzle(sqlite);
-
 const documents = sqliteTable("documents", {
   id: text("id").primaryKey(),
   templateId: text("template_id").notNull(),
@@ -1316,7 +1325,7 @@ const documents = sqliteTable("documents", {
     mode: "timestamp"
   }).notNull()
 });
-sqliteTable("audit_logs", {
+const auditLogs = sqliteTable("audit_logs", {
   id: text("id").primaryKey(),
   documentId: text("document_id").notNull().references(() => documents.id),
   previousState: text("previous_state", {
@@ -1330,6 +1339,22 @@ sqliteTable("audit_logs", {
     mode: "timestamp"
   }).notNull(),
   note: text("note")
+});
+
+const schema = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  auditLogs: auditLogs,
+  documents: documents
+});
+
+var _a;
+const databasePath = (_a = process.env.DB_FILE_NAME) != null ? _a : "local.db";
+const sqlite = new Database(databasePath, {
+  create: true
+});
+sqlite.exec("PRAGMA foreign_keys = ON;");
+const db = drizzle(sqlite, {
+  schema
 });
 
 const ALLOWED_TRANSITIONS = {
@@ -1390,21 +1415,33 @@ async function transitionDocument(id, input) {
     );
   }
   const now = /* @__PURE__ */ new Date();
-  const result = await db.update(documents).set({
-    state: nextState,
-    updatedAt: now
-  }).where(
-    and(
-      eq(documents.id, id),
-      eq(documents.state, currentState)
-    )
-  ).returning();
-  if (result.length === 0) {
-    throw new Error(
-      "Document state changed during transition"
-    );
-  }
-  return result[0];
+  return db.transaction((tx) => {
+    var _a;
+    const updatedDocuments = tx.update(documents).set({
+      state: nextState,
+      updatedAt: now
+    }).where(
+      and(
+        eq(documents.id, id),
+        eq(documents.state, currentState)
+      )
+    ).returning().all();
+    if (updatedDocuments.length === 0) {
+      throw new Error(
+        "Document state changed during transition"
+      );
+    }
+    tx.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      documentId: id,
+      previousState: currentState,
+      nextState,
+      actor: input.actor,
+      timestamp: now,
+      note: (_a = input.note) != null ? _a : null
+    }).run();
+    return updatedDocuments[0];
+  });
 }
 
 const _id__get = defineEventHandler(async (event) => {
@@ -1428,6 +1465,38 @@ const _id__get = defineEventHandler(async (event) => {
 const _id__get$1 = /*#__PURE__*/Object.freeze({
   __proto__: null,
   default: _id__get
+});
+
+async function getAuditTrail(documentId) {
+  return db.select().from(auditLogs).where(
+    eq(auditLogs.documentId, documentId)
+  ).orderBy(
+    asc(auditLogs.timestamp)
+  );
+}
+
+const auditTrail_get = defineEventHandler(async (event) => {
+  const id = getRouterParam(event, "id");
+  if (!id) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Document ID is required"
+    });
+  }
+  const document = await getDocumentById(id);
+  if (!document) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: "Document not found"
+    });
+  }
+  const auditTrail = await getAuditTrail(id);
+  return auditTrail;
+});
+
+const auditTrail_get$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: auditTrail_get
 });
 
 const createDocumentSchema = z.object({

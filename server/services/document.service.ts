@@ -1,7 +1,11 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../db";
-import { documents } from "../db/schema";
+
+import {
+    documents,
+    auditLogs,
+} from "../db/schema";
 import type { CreateDocumentInput } from "../validation/document";
 
 import {
@@ -84,25 +88,46 @@ export async function transitionDocument(
 
     const now = new Date();
 
-    const result = await db
-        .update(documents)
-        .set({
-            state: nextState,
-            updatedAt: now,
-        })
-        .where(
-            and(
-                eq(documents.id, id),
-                eq(documents.state, currentState),
-            ),
-        )
-        .returning();
+    return db.transaction((tx) => {
+        const updatedDocuments = tx
+            .update(documents)
+            .set({
+                state: nextState,
+                updatedAt: now,
+            })
+            .where(
+                and(
+                    eq(documents.id, id),
+                    eq(documents.state, currentState),
+                ),
+            )
+            .returning()
+            .all();
 
-    if (result.length === 0) {
-        throw new Error(
-            "Document state changed during transition",
-        );
-    }
+        if (updatedDocuments.length === 0) {
+            throw new Error(
+                "Document state changed during transition",
+            );
+        }
 
-    return result[0];
+        tx.insert(auditLogs)
+            .values({
+                id: crypto.randomUUID(),
+
+                documentId: id,
+
+                previousState: currentState,
+
+                nextState,
+
+                actor: input.actor,
+
+                timestamp: now,
+
+                note: input.note ?? null,
+            })
+            .run();
+
+        return updatedDocuments[0];
+    });
 }
